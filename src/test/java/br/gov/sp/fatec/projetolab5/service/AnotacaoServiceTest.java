@@ -4,128 +4,87 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.web.server.ResponseStatusException;
 
 import br.gov.sp.fatec.projetolab5.entity.Anotacao;
 import br.gov.sp.fatec.projetolab5.entity.Usuario;
 import br.gov.sp.fatec.projetolab5.repository.AnotacaoRepository;
+import br.gov.sp.fatec.projetolab5.repository.UsuarioRepository;
 
 @SpringBootTest
 public class AnotacaoServiceTest {
-
+    
     @Autowired
     private AnotacaoService service;
 
     @MockBean
-    private AnotacaoRepository anotacaoRepo;
+    private UsuarioRepository usuarioRepo;
 
     @MockBean
-    private SegurancaService segurancaService;
+    private AnotacaoRepository anotacaoRepo;
 
     @Test
     public void novaAnotacaoTestOk() {
         Usuario usuario = new Usuario();
         usuario.setId(1L);
         usuario.setNome("Teste");
-        usuario.setSenha("abc123");
-        Anotacao anotacao = new Anotacao();
+        usuario.setSenha("Senha");
+        Optional<Usuario> usuarioOp = Optional.of(usuario);
+        Mockito.when(usuarioRepo.findByNome("Teste")).thenReturn(usuarioOp);
+
+        Anotacao anotacao = new Anotacao("Texto bem longo!", LocalDateTime.now(), usuario);
         anotacao.setId(1L);
-        anotacao.setTexto("Anotação teste");
-        anotacao.setUsuario(usuario);
-        anotacao.setDataHora(new Date());
-        Mockito.when(segurancaService.buscarUsuarioPorId(1L)).thenReturn(usuario);
+
         Mockito.when(anotacaoRepo.save(any())).thenReturn(anotacao);
-        assertEquals("Anotação teste", service.novaAnotacao(anotacao).getTexto());
+        
+        assertEquals(1L, service.novaAnotacao("Texto bem longo!", "Teste").getId());
     }
 
     @Test
-    public void novaAnotacaoDataHoraNullTestOk() {
-        Usuario usuario = new Usuario();
-        usuario.setId(1L);
-        usuario.setNome("Teste");
-        usuario.setSenha("abc123");
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setTexto("Anotação teste");
-        anotacao.setUsuario(usuario);
-        Mockito.when(segurancaService.buscarUsuarioPorId(1L)).thenReturn(usuario);
-        Mockito.when(anotacaoRepo.save(any())).thenReturn(anotacao);
-        assertEquals("Anotação teste", service.novaAnotacao(anotacao).getTexto());
-    }
-
-    @Test
-    public void novaAnotacaoTextoNullTestNOk() {
-        Usuario usuario = new Usuario();
-        usuario.setId(1L);
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setUsuario(usuario);
-        anotacao.setDataHora(new Date());
-        assertThrows(IllegalArgumentException.class, () -> {
-            service.novaAnotacao(anotacao);
+    public void novaAnotacaoTestNOkTextoNull() {
+        assertThrows(ResponseStatusException.class, () -> {
+            service.novaAnotacao(null, "Teste");
         });
     }
 
     @Test
-    public void novaAnotacaoTextoBlankTestNOk() {
-        Usuario usuario = new Usuario();
-        usuario.setId(1L);
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setTexto(" ");
-        anotacao.setUsuario(usuario);
-        anotacao.setDataHora(new Date());
-        assertThrows(IllegalArgumentException.class, () -> {
-            service.novaAnotacao(anotacao);
+    public void novaAnotacaoTestNOkTextoBranco() {
+        assertThrows(ResponseStatusException.class, () -> {
+            service.novaAnotacao("    ", "Teste");
         });
     }
 
     @Test
-    public void novaAnotacaoUsuarioNullTestNOk() {
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setTexto("Anotação teste");
-        anotacao.setDataHora(new Date());
-        assertThrows(IllegalArgumentException.class, () -> {
-            service.novaAnotacao(anotacao);
+    public void novaAnotacaoTestNOkUsuarioNull() {
+        assertThrows(ResponseStatusException.class, () -> {
+            service.novaAnotacao("Texto muito longo!", null);
         });
     }
 
     @Test
-    public void novaAnotacaoUsuarioIdNullTestNOk() {
-        Usuario usuario = new Usuario();
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setTexto("Anotação teste");
-        anotacao.setUsuario(usuario);
-        anotacao.setDataHora(new Date());
-        assertThrows(IllegalArgumentException.class, () -> {
-            service.novaAnotacao(anotacao);
+    public void novaAnotacaoTestNOkTextoCurto() {
+        assertThrows(ResponseStatusException.class, () -> {
+            service.novaAnotacao("Olá", "Teste");
         });
     }
 
     @Test
-    public void novaAnotacaoUsuarioNaoExisteTestNOk() {
-        Usuario usuario = new Usuario();
-        usuario.setId(1L);
-        usuario.setNome("Teste");
-        usuario.setSenha("abc123");
-        Anotacao anotacao = new Anotacao();
-        anotacao.setId(1L);
-        anotacao.setTexto("Anotação teste");
-        anotacao.setUsuario(usuario);
-        anotacao.setDataHora(new Date());
-        Mockito.when(segurancaService.buscarUsuarioPorId(1L)).thenThrow(IllegalArgumentException.class);
-        assertThrows(RuntimeException.class, () -> {
-            service.novaAnotacao(anotacao);
+    public void novaAnotacaoTestNOkUsuarioNaoEncontrado() {
+        Mockito.when(usuarioRepo.findByNome("Admin")).thenReturn(Optional.empty());
+
+        assertThrows(ResponseStatusException.class, () -> {
+            service.novaAnotacao("Texto muito longo!", "Admin");
         });
     }
+
 
 
 }
